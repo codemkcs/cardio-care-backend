@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from pathlib import Path
 
 # =========================================================
-# PATH SETUP (CRITICAL FIX)
+# PATH SETUP
 # =========================================================
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_DIR = BASE_DIR / "models"
@@ -22,7 +22,7 @@ scaler = preproc["scaler"]
 le = preproc["label_encoder"]
 
 # =========================================================
-# MODEL DEFINITION (UNCHANGED ARCHITECTURE)
+# MODEL DEFINITIONS
 # =========================================================
 class BayesianLinear(nn.Module):
     def __init__(self, in_features, out_features):
@@ -37,7 +37,6 @@ class BayesianLinear(nn.Module):
 class CardioBNN(nn.Module):
     def __init__(self):
         super().__init__()
-        # ✅ FIX: MUST MATCH TRAINING (19 FEATURES)
         self.fc1 = BayesianLinear(19, 64)
         self.fc2 = BayesianLinear(64, 32)
         self.fc3 = BayesianLinear(32, 4)
@@ -50,7 +49,7 @@ class CardioBNN(nn.Module):
 
 
 # =========================================================
-# LOAD TRAINED MODEL
+# LOAD MODEL
 # =========================================================
 model = CardioBNN()
 model.load_state_dict(
@@ -60,9 +59,10 @@ model.load_state_dict(
 model.eval()
 
 # =========================================================
-# MAPPING FUNCTIONS (UNCHANGED)
+# MAPPING FUNCTIONS (SAME AS TRAINING)
 # =========================================================
-def map_gender(g): return 1 if str(g).lower() == "male" else 0
+def map_gender(g): 
+    return 1 if str(g).lower() == "male" else 0
 
 def map_age(a):
     if 20 <= a <= 39: return 10
@@ -77,22 +77,42 @@ def map_bmi(b):
     elif b >= 30: return 20
     return 0
 
-def map_whr(w): return 1 if w < 0.9 else 10
-def map_fbs(f): return 1 if f < 110 else 5 if f < 126 else 10
-def map_hba1c(h): return 1 if h < 5.6 else 10 if h < 6.5 else 30 if h < 8 else 50
+def map_whr(w): 
+    return 1 if w < 0.9 else 10
+
+def map_fbs(f): 
+    return 1 if f < 110 else 5 if f < 126 else 10
+
+def map_hba1c(h): 
+    return 1 if h < 5.6 else 10 if h < 6.5 else 30 if h < 8 else 50
 
 def map_hdl(h, g):
     if g == 1:
         return 1 if h > 55 else 10 if h >= 35 else 20
     return 1 if h > 65 else 10 if h >= 45 else 20
 
-def map_ldl(l): return 1 if l < 100 else 20 if l <= 160 else 40
-def map_vldl(v): return 1 if v <= 30 else 2 if v <= 40 else 3
-def map_tgl(t): return 1 if t < 150 else 20 if t <= 250 else 30
-def map_tc(tc): return 1 if tc < 200 else 10 if tc <= 300 else 20
-def map_creatinine(c): return 1 if c <= 1.2 else 3 if c <= 2 else 6
-def map_tyg(t): return 1 if t < 8 else 10 if t <= 8.7 else 20
-def map_hdl_ldl(r): return 1 if r < 2 else 5 if r < 3.5 else 10
+def map_ldl(l): 
+    return 1 if l < 100 else 20 if l <= 160 else 40
+
+def map_vldl(v): 
+    return 1 if v <= 30 else 2 if v <= 40 else 3
+
+def map_tgl(t): 
+    return 1 if t < 150 else 20 if t <= 250 else 30
+
+def map_tc(tc): 
+    return 1 if tc < 200 else 10 if tc <= 300 else 20
+
+def map_creatinine(c): 
+    return 1 if c <= 1.2 else 3 if c <= 2 else 6
+
+# ✅ TyG mapping (AS YOU REQUESTED)
+def map_tyg(t):
+    return 1 if t < 8 else 10 if t <= 8.7 else 20
+
+# ✅ LDL / HDL ratio mapping (AS YOU REQUESTED)
+def map_hdl_ldl(r):
+    return 1 if r < 2 else 5 if r < 3.5 else 10
 
 def map_bp_numbers(s, d):
     if s < 120 and d < 80: return 1
@@ -100,10 +120,17 @@ def map_bp_numbers(s, d):
     elif s < 160 or d < 100: return 10
     return 20
 
-def map_alcohol(a): return 5 if a == "Yes" else 1
-def map_alcohol_freq(f): return {"Daily":20,"Several times a week":15,"Once a week":10,"Occasionally":5,"Past":3}.get(f,1)
-def map_smoking(s): return 10 if s == "Yes" else 1
-def map_smoking_freq(f): return {"Daily":40,"Several times a week":30,"Once a week":20,"Occasionally":10,"Past":6}.get(f,2)
+def map_alcohol(a): 
+    return 5 if a == "Yes" else 1
+
+def map_alcohol_freq(f): 
+    return {"Daily":20,"Several times a week":15,"Once a week":10,"Occasionally":5,"Past":3}.get(f,1)
+
+def map_smoking(s): 
+    return 10 if s == "Yes" else 1
+
+def map_smoking_freq(f): 
+    return {"Daily":40,"Several times a week":30,"Once a week":20,"Occasionally":10,"Past":6}.get(f,2)
 
 # =========================================================
 # FASTAPI APP
@@ -139,10 +166,12 @@ class PredictInput(BaseModel):
 @app.post("/predict")
 def predict(data: PredictInput):
 
+    # Auto-calculated features
     tyg = np.log((data.tgl * data.fbs) / 2)
-    ldl_hdl = data.ldl / data.hdl
+    ldl_hdl = data.ldl / data.hdl if data.hdl != 0 else 0
     gender_code = map_gender(data.gender)
 
+    # ✅ EXACT 19 FEATURES (MATCH TRAINING)
     ml_features = [
         gender_code,
         map_age(data.age),
@@ -158,7 +187,14 @@ def predict(data: PredictInput):
         map_creatinine(data.creatinine),
         map_tyg(tyg),
         map_hdl_ldl(ldl_hdl),
+        map_bp_numbers(data.systolic, data.diastolic),
+        map_alcohol(data.alcohol),
+        map_alcohol_freq(data.alcohol_freq),
+        map_smoking(data.smoking),
+        map_smoking_freq(data.smoking_freq),
     ]
+
+    assert len(ml_features) == 19, "Feature mismatch with training"
 
     X = scaler.transform([ml_features])
     X = torch.tensor(X, dtype=torch.float32)
@@ -169,35 +205,10 @@ def predict(data: PredictInput):
     pred_idx = int(np.argmax(probs))
     pred_label = le.inverse_transform([pred_idx])[0]
 
-    total_score = sum(ml_features)
-    rule_total = (
-        total_score +
-        map_bp_numbers(data.systolic, data.diastolic) +
-        map_alcohol(data.alcohol) +
-        map_alcohol_freq(data.alcohol_freq) +
-        map_smoking(data.smoking) +
-        map_smoking_freq(data.smoking_freq)
-    )
-
-    if rule_total < 110:
-        rule_label = "Low Risk"
-    elif rule_total < 190:
-        rule_label = "Modest Risk"
-    elif rule_total < 260:
-        rule_label = "High Risk"
-    else:
-        rule_label = "Very High Risk"
-
     return {
-        "ml_prediction": {
-            "label": pred_label,
-            "confidence": float(probs[pred_idx]),
-            "probabilities": {
-                le.classes_[i]: float(probs[i]) for i in range(len(probs))
-            }
-        },
-        "rule_based": {
-            "score": rule_total,
-            "category": rule_label
+        "prediction": pred_label,
+        "confidence": float(probs[pred_idx]),
+        "probabilities": {
+            le.classes_[i]: float(probs[i]) for i in range(len(probs))
         }
     }
