@@ -4,12 +4,18 @@ import torch
 import torch.nn as nn
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import Dict
+from pathlib import Path
+
+# =========================================================
+# PATH SETUP (CRITICAL FIX)
+# =========================================================
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_DIR = BASE_DIR / "models"
 
 # =========================================================
 # LOAD PREPROCESSING
 # =========================================================
-with open("models/bnn_19f_GPU2.pkl", "rb") as f:
+with open(MODEL_DIR / "bnn_19f_GPU2.pkl", "rb") as f:
     preproc = pickle.load(f)
 
 scaler = preproc["scaler"]
@@ -42,9 +48,12 @@ class CardioBNN(nn.Module):
         return self.fc3(x)
 
 
+# =========================================================
+# LOAD TRAINED MODEL
+# =========================================================
 model = CardioBNN()
 model.load_state_dict(
-    torch.load("models/bbnn_19f_GPU2.pth", map_location="cpu"),
+    torch.load(MODEL_DIR / "bnn_model.pth", map_location="cpu"),
     strict=False
 )
 model.eval()
@@ -96,7 +105,7 @@ def map_smoking(s): return 10 if s == "Yes" else 1
 def map_smoking_freq(f): return {"Daily":40,"Several times a week":30,"Once a week":20,"Occasionally":10,"Past":6}.get(f,2)
 
 # =========================================================
-# FASTAPI
+# FASTAPI APP
 # =========================================================
 app = FastAPI(title="Cardio Care API")
 
@@ -123,7 +132,6 @@ class PredictInput(BaseModel):
     smoking: str
     smoking_freq: str
 
-
 # =========================================================
 # PREDICT ENDPOINT
 # =========================================================
@@ -134,7 +142,6 @@ def predict(data: PredictInput):
     ldl_hdl = data.ldl / data.hdl
     gender_code = map_gender(data.gender)
 
-    # ML FEATURES (EXACT SAME AS STREAMLIT)
     ml_features = [
         gender_code,
         map_age(data.age),
@@ -161,7 +168,6 @@ def predict(data: PredictInput):
     pred_idx = int(np.argmax(probs))
     pred_label = le.inverse_transform([pred_idx])[0]
 
-    # RULE-BASED SCORE (UNCHANGED)
     total_score = sum(ml_features)
     rule_total = (
         total_score +
@@ -172,10 +178,14 @@ def predict(data: PredictInput):
         map_smoking_freq(data.smoking_freq)
     )
 
-    if rule_total < 110: rule_label = "Low Risk"
-    elif rule_total < 190: rule_label = "Modest Risk"
-    elif rule_total < 260: rule_label = "High Risk"
-    else: rule_label = "Very High Risk"
+    if rule_total < 110:
+        rule_label = "Low Risk"
+    elif rule_total < 190:
+        rule_label = "Modest Risk"
+    elif rule_total < 260:
+        rule_label = "High Risk"
+    else:
+        rule_label = "Very High Risk"
 
     return {
         "ml_prediction": {
