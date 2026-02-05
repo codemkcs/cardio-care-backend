@@ -5,12 +5,9 @@ scikit-learn
 pydantic
 torch
 
-# OCR + image handling
-easyocr
-opencv-python-headless
-pillow
-python-multipart
-regex
+# OCR (LIGHTWEIGHT)
+pytesseract
+Pillow
 
-# Stability
-scipy
+# File upload support
+python-multipart
