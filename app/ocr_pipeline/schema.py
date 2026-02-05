@@ -1,0 +1,15 @@
+EXPECTED_FIELDS = {
+    "age": float,
+    "bmi": float,
+    "whr": float,
+    "fbs": float,
+    "hba1c": float,
+    "hdl": float,
+    "ldl": float,
+    "vldl": float,
+    "tgl": float,
+    "tc": float,
+    "creatinine": float,
+    "systolic": float,
+    "diastolic": float,
+}
