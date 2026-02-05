@@ -11,24 +11,21 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 @router.post("/upload")
 async def ocr_upload(file: UploadFile = File(...)):
-    # ❌ Only invalid file should fail
-    if not file.content_type or not file.content_type.startswith("image/"):
+
+    # ✅ FIX: validate by extension, NOT content_type
+    if Path(file.filename).suffix.lower() not in [".jpg", ".jpeg", ".png"]:
         raise HTTPException(status_code=400, detail="Only image files allowed")
 
-    suffix = Path(file.filename).suffix
-    filename = f"{uuid.uuid4()}{suffix}"
+    filename = f"{uuid.uuid4()}{Path(file.filename).suffix}"
     path = UPLOAD_DIR / filename
 
     with open(path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    # ✅ Lazy imports
     from app.ocr_pipeline.ocr_engine import extract_text_with_boxes
     from app.ocr_pipeline.field_mapper import map_fields
 
     texts = extract_text_with_boxes(str(path))
-
-    # ✅ NEVER FAIL OCR — return empty safely
     mapped = map_fields(texts) if texts else {}
 
     return {
