@@ -13,7 +13,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 async def ocr_upload(file: UploadFile = File(...)):
 
     # ✅ FIX: validate by extension, NOT content_type
-    if Path(file.filename).suffix.lower() not in [".jpg", ".jpeg", ".png"]:
+    if Path(file.filename).suffix.lower() not in [".jpg", ".jpeg", ".png",".webp"]:
         raise HTTPException(status_code=400, detail="Only image files allowed")
 
     filename = f"{uuid.uuid4()}{Path(file.filename).suffix}"
