@@ -1,33 +1,44 @@
 import re
 from .preprocess import normalize
 
-FIELD_PATTERNS = {
-    "age": r"\bage\b\s*(\d{1,3})",
-    "bmi": r"\bbmi\b\s*([\d.]+)",
-    "whr": r"\bwhr\b\s*([\d.]+)",
-    "fbs": r"\bfbs\b\s*([\d.]+)",
-    "hba1c": r"\bhba1c\b\s*([\d.]+)",
-    "hdl": r"\bhdl\b\s*([\d.]+)",
-    "ldl": r"\bldl\b\s*([\d.]+)",
-    "vldl": r"\bvldl\b\s*([\d.]+)",
-    "tgl": r"\b(tgl|triglycerides)\b\s*([\d.]+)",
-    "tc": r"\b(tc|total cholesterol)\b\s*([\d.]+)",
-    "creatinine": r"\bcreatinine\b\s*([\d.]+)",
-    "systolic": r"\bsystolic\b\s*bp\s*(\d{2,3})",
-    "diastolic": r"\bdiastolic\b\s*bp\s*(\d{2,3})",
+# All aliases OCR may produce
+FIELD_ALIASES = {
+    "age": ["age"],
+    "bmi": ["bmi"],
+    "whr": ["whr"],
+    "fbs": ["fbs", "fasting blood sugar"],
+    "hba1c": ["hba1c", "hbale", "hbaic"],
+    "hdl": ["hdl"],
+    "ldl": ["ldl"],
+    "vldl": ["vldl"],
+    "tgl": ["tgl", "triglycerides"],
+    "tc": ["tc", "total cholesterol"],
+    "creatinine": ["creatinine"],
+    "systolic": ["systolic"],
+    "diastolic": ["diastolic"],
 }
 
+NUMBER_PATTERN = re.compile(r"\d+(\.\d+)?")
+
 def map_fields(texts: list) -> dict:
-    joined = normalize(" ".join(texts))
+    text = normalize(" ".join(texts))
+
+    # remove units
+    for unit in ["mg/dl", "mmhg", "%"]:
+        text = text.replace(unit, "")
+
+    tokens = text.split()
     output = {}
 
-    for field, pattern in FIELD_PATTERNS.items():
-        match = re.search(pattern, joined)
-        if match:
-            value = match.groups()[-1]
-            try:
-                output[field] = float(value)
-            except:
-                pass
+    for field, aliases in FIELD_ALIASES.items():
+        for alias in aliases:
+            if alias in tokens:
+                idx = tokens.index(alias)
+
+                # search forward for nearest number
+                for j in range(idx + 1, min(idx + 6, len(tokens))):
+                    if NUMBER_PATTERN.fullmatch(tokens[j]):
+                        output[field] = float(tokens[j])
+                        break
 
     return output
