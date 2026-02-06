@@ -26,9 +26,9 @@ async def ocr_upload(file: UploadFile = File(...)):
     from app.ocr_pipeline.field_mapper import map_fields
 
     texts = extract_text_with_boxes(str(path))
-    mapped = map_fields(texts) if texts else {}
-
     print("RAW OCR TEXT:", texts)
+    
+    mapped = map_fields(texts) if texts else {}
     print("MAPPED FIELDS:", mapped)
     
     return {
