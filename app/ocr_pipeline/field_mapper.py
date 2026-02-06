@@ -1,44 +1,33 @@
 import re
 from .preprocess import normalize
 
-# All aliases OCR may produce
-FIELD_ALIASES = {
-    "age": ["age"],
-    "bmi": ["bmi"],
-    "whr": ["whr"],
-    "fbs": ["fbs", "fasting blood sugar"],
-    "hba1c": ["hba1c", "hbale", "hbaic"],
-    "hdl": ["hdl"],
-    "ldl": ["ldl"],
-    "vldl": ["vldl"],
-    "tgl": ["tgl", "triglycerides"],
-    "tc": ["tc", "total cholesterol"],
-    "creatinine": ["creatinine"],
-    "systolic": ["systolic"],
-    "diastolic": ["diastolic"],
+FIELD_REGEX = {
+    "age": r"\bage\b[^0-9]{0,10}(\d{2,3})",
+    "bmi": r"\bbmi\b[^0-9]{0,10}([\d.]+)",
+    "whr": r"\bwhr\b[^0-9]{0,10}([\d.]+)",
+    "fbs": r"(fbs|fasting blood sugar)[^0-9]{0,15}([\d.]+)",
+    "hba1c": r"(hba1c|hbaic|hbale)[^0-9]{0,10}([\d.]+)",
+    "hdl": r"\bhdl\b[^0-9]{0,15}([\d.]+)",
+    "ldl": r"\bldl\b[^0-9]{0,15}([\d.]+)",
+    "vldl": r"\bvldl\b[^0-9]{0,15}([\d.]+)",
+    "tgl": r"(tgl|triglycerides)[^0-9]{0,15}([\d.]+)",
+    "tc": r"(tc|total cholesterol)[^0-9]{0,15}([\d.]+)",
+    "creatinine": r"\bcreatinine\b[^0-9]{0,15}([\d.]+)",
+    "bp": r"(\d{2,3})\s*/\s*(\d{2,3})",
 }
-
-NUMBER_PATTERN = re.compile(r"\d+(\.\d+)?")
 
 def map_fields(texts: list) -> dict:
     text = normalize(" ".join(texts))
-
-    # remove units
-    for unit in ["mg/dl", "mmhg", "%"]:
-        text = text.replace(unit, "")
-
-    tokens = text.split()
     output = {}
 
-    for field, aliases in FIELD_ALIASES.items():
-        for alias in aliases:
-            if alias in tokens:
-                idx = tokens.index(alias)
-
-                # search forward for nearest number
-                for j in range(idx + 1, min(idx + 6, len(tokens))):
-                    if NUMBER_PATTERN.fullmatch(tokens[j]):
-                        output[field] = float(tokens[j])
-                        break
+    for field, pattern in FIELD_REGEX.items():
+        match = re.search(pattern, text)
+        if match:
+            if field == "bp":
+                output["systolic"] = float(match.group(1))
+                output["diastolic"] = float(match.group(2))
+            else:
+                value = match.groups()[-1]
+                output[field] = float(value)
 
     return output
