@@ -1,13 +1,10 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 fastapi
 uvicorn
+pillow
+pytesseract
+python-multipart
 numpy
 scikit-learn
-pydantic
-torch
-
-# OCR (LIGHTWEIGHT)
-pytesseract
-Pillow
-
-# File upload support
-python-multipart
+torch==2.1.0+cpu
